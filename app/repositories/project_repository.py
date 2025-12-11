@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,29 +13,35 @@ from app.models.project import Project
 
 
 class ProjectRepository:
+    """Repository for Project CRUD operations."""
 
     def __init__(self, session: Session):
         self.session = session
 
     def get_all(self) -> List[Project]:
+        """Get all projects ordered by created_at."""
         stmt = select(Project).order_by(Project.created_at)
         result = self.session.execute(stmt)
         return list(result.scalars().all())
 
     def get_by_id(self, project_id: int) -> Optional[Project]:
+        """Get a project by its ID."""
         stmt = select(Project).where(Project.id == project_id)
         result = self.session.execute(stmt)
         return result.scalar_one_or_none()
 
     def get_by_name(self, name: str) -> Optional[Project]:
+        """Get a project by its name."""
         stmt = select(Project).where(Project.name == name)
         result = self.session.execute(stmt)
         return result.scalar_one_or_none()
 
     def count(self) -> int:
+        """Count total number of projects."""
         return len(self.get_all())
 
     def create(self, name: str, description: str) -> Project:
+        """Create a new project."""
         # Check for duplicate name
         existing = self.get_by_name(name)
         if existing:
@@ -45,6 +53,7 @@ class ProjectRepository:
         return project
 
     def delete(self, project_id: int) -> Project:
+        """Delete a project and return it."""
         project = self.get_by_id(project_id)
         if not project:
             raise EntityNotFoundException("Project", project_id)
