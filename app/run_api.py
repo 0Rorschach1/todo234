@@ -5,16 +5,25 @@ import uvicorn
 def main():
     """Run the FastAPI application with uvicorn."""
     host = os.getenv("API_HOST", "127.0.0.1")
-    port = int(os.getenv("API_PORT", "8000"))
+        
+    try:
+        port = int(os.getenv("API_PORT", "8000"))
+    except ValueError:
+        print(f"Error: API_PORT must be a valid integer, got '{os.getenv('API_PORT')}'", file=sys.stderr)
+        sys.exit(1)
+
+    api_env = os.getenv("API_ENV", "development")
+    reload = api_env.lower() != "production"
     
     uvicorn.run(
         "app.api.app:app",
         host=host,
         port=port,
-        reload=True,
+        reload=reload,
     )
 
 
 if __name__ == "__main__":
     main()
+
 
