@@ -1,7 +1,11 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from app.api import api_v1_router
+
+load_dotenv()
 
 app = FastAPI(
     title="ToDoList API",
@@ -27,23 +31,20 @@ This API follows a layered architecture:
     docs_url="/docs",
     redoc_url="/redoc",
 )
-
-# CORS middleware configuration
+allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API routers
 app.include_router(api_v1_router)
 
 
 @app.get("/", tags=["Root"])
 async def root():
-    """Root endpoint - API health check."""
     return {
         "message": "ToDoList API is running",
         "version": "0.3.0",
@@ -54,5 +55,4 @@ async def root():
 
 @app.get("/health", tags=["Root"])
 async def health_check():
-    """Health check endpoint."""
     return {"status": "healthy"}

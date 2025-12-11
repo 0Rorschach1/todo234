@@ -1,13 +1,27 @@
 [tool.poetry]
 name = "todolist"
-version = "0.1.0"
-description = ""
-authors = ["Your Name <you@example.com>"]
+version = "0.3.0"
+description = "A ToDoList manager with RESTful API built with FastAPI and PostgreSQL."
+authors = ["Your Name <your.email@example.com>"]
 readme = "README.md"
+packages = [{ include = "app" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.10"
+python-dotenv = "^1.0.0"
+sqlalchemy = "^2.0.44"
+alembic = "^1.17.2"
+psycopg2-binary = "^2.9.11"
+schedule = "^1.2.2"
+fastapi = "^0.115.0"
+uvicorn = {extras = ["standard"], version = "^0.32.0"}
+pydantic = "^2.10.0"
 
+[tool.poetry.scripts]
+todolist = "app.main:main"
+todolist-autoclose = "app.commands.autoclose_overdue:autoclose_overdue_command"
+todolist-scheduler = "app.commands.scheduler:run_scheduler"
+todolist-api = "app.run_api:main"
 
 [build-system]
 requires = ["poetry-core"]
