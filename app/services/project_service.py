@@ -1,5 +1,6 @@
 
 import os
+
 from typing import List, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -17,18 +18,23 @@ load_dotenv()
 
 
 class ProjectService:
+    """Service for project business logic."""
 
     def __init__(self, project_repository: ProjectRepository):
         self.project_repository = project_repository
         self.max_projects = int(os.getenv("MAX_NUMBER_OF_PROJECTS", 10))
 
     def create_project(self, name: str, description: str) -> Tuple[bool, str]:
+        """Create a new project with validation."""
+        # Validate name length
         if len(name) > 30:
             return False, "Error: Project name cannot exceed 30 characters."
 
+        # Validate description length
         if len(description) > 150:
             return False, "Error: Project description cannot exceed 150 characters."
 
+        # Check max projects limit
         if self.project_repository.count() >= self.max_projects:
             return (
                 False,
@@ -42,12 +48,15 @@ class ProjectService:
             return False, "Error: A project with this name already exists."
 
     def get_all_projects(self) -> List[Project]:
+        """Get all projects."""
         return self.project_repository.get_all()
 
     def get_project_by_id(self, project_id: int) -> Optional[Project]:
+        """Get a project by ID."""
         return self.project_repository.get_by_id(project_id)
 
     def delete_project(self, project_id: int) -> Tuple[bool, str]:
+        """Delete a project."""
         try:
             project = self.project_repository.delete(project_id)
             return (
