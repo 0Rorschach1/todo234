@@ -1,88 +1,82 @@
+import os
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from sqlalchemy import select, and_
-from sqlalchemy.orm import Session
+from dotenv import load_dotenv
 
-from app.exceptions.repository_exceptions import EntityNotFoundException
+from app.exceptions import EntityNotFoundException
 from app.models.task import Task
+from app.repositories.project_repository import ProjectRepository
+from app.repositories.task_repository import TaskRepository
+
+load_dotenv()
 
 
-class TaskRepository:
+class TaskService:
 
-    def __init__(self, session: Session):
-        self.session = session
-
-    def get_all(self) -> List[Task]:
-        stmt = select(Task).order_by(Task.created_at)
-        result = self.session.execute(stmt)
-        return list(result.scalars().all())
-
-    def get_by_id(self, task_id: int) -> Optional[Task]:
-        stmt = select(Task).where(Task.id == task_id)
-        result = self.session.execute(stmt)
-        return result.scalar_one_or_none()
-
-    def get_by_project_id(self, project_id: int) -> List[Task]:
-        stmt = select(Task).where(Task.project_id == project_id).order_by(Task.created_at)
-        result = self.session.execute(stmt)
-        return list(result.scalars().all())
-
-    def count_by_project_id(self, project_id: int) -> int:
-        return len(self.get_by_project_id(project_id))
-
-    def get_overdue_tasks(self) -> List[Task]:
-        now = datetime.now()
-        stmt = select(Task).where(
-            and_(
-                Task.deadline.is_not(None),
-                Task.deadline < now,
-                Task.status != "done",
-            )
+    def __init__(
+        self,
+        task_repository: TaskRepository,
+        project_repository: ProjectRepository,
+    ):
+        self.task_repository = task_repository
+        self.project_repository = project_repository
+        self.max_tasks_per_project = int(
+            os.getenv("MAX_NUMBER_OF_TASKS_PER_PROJECT", 100)
         )
-        result = self.session.execute(stmt)
-        return list(result.scalars().all())
+        self.valid_statuses = ["todo", "doing", "done"]
 
-    def create(
+    def add_task(
         self,
         project_id: int,
         title: str,
         description: str,
         deadline: Optional[datetime] = None,
-    ) -> Task:
-        task = Task(
-            project_id=project_id,
-            title=title,
-            description=description,
-            deadline=deadline,
-        )
-        self.session.add(task)
-        self.session.flush()  # Get the ID
-        return task
+    ) -> Tuple[bool, str]:
+        if len(title) > 30:
+            return False, "Error: Task title cannot exceed 30 characters."
 
-    def update_status(self, task_id: int, new_status: str) -> Task:
-        task = self.get_by_id(task_id)
-        if not task:
-            raise EntityNotFoundException("Task", task_id)
+        if len(description) > 150:
+            return False, "Error: Task description cannot exceed 150 characters."
 
-        old_status = task.status
-        task.status = new_status
+        project = self.project_repository.get_by_id(project_id)
+        if not project:
+            return False, "Error: Project with this ID not found."
 
-        # If marking as done, set closed_at
-        if new_status == "done" and old_status != "done":
-            task.closed_at = datetime.now()
+        task_count = self.task_repository.count_by_project_id(project_id)
+        if task_count >= self.max_tasks_per_project:
+            return (
+                False,
+                f"Error: Maximum number of tasks per project ({self.max_tasks_per_project}) reached.",
+            )
 
-        return task
+        task = self.task_repository.create(project_id, title, description, deadline)
+        return True, f"Task '{title}' created successfully. (ID: {task.id})"
 
-    def close_overdue_task(self, task: Task) -> Task:
-        task.status = "done"
-        task.closed_at = datetime.now()
-        return task
+    def change_task_status(self, task_id: int, new_status: str) -> Tuple[bool, str]:
+        if new_status not in self.valid_statuses:
+            return (
+                False,
+                f"Error: Status '{new_status}' is invalid. Valid statuses: {', '.join(self.valid_statuses)}",
+            )
 
-    def delete(self, task_id: int) -> Task:
-        task = self.get_by_id(task_id)
-        if not task:
-            raise EntityNotFoundException("Task", task_id)
+        try:
+            task = self.task_repository.get_by_id(task_id)
+            if not task:
+                return False, "Error: Task with this ID not found."
 
-        self.session.delete(task)
-        return task
+            old_status = task.status
+            self.task_repository.update_status(task_id, new_status)
+            return True, f"Task status changed from '{old_status}' to '{new_status}'."
+        except EntityNotFoundException:
+            return False, "Error: Task with this ID not found."
+
+    def get_tasks_by_project(self, project_id: int) -> List[Task]:
+        return self.task_repository.get_by_project_id(project_id)
+
+
+    def close_overdue_tasks(self) -> int:
+        overdue_tasks = self.task_repository.get_overdue_tasks()
+        for task in overdue_tasks:
+            self.task_repository.close_overdue_task(task)
+        return len(overdue_tasks)
