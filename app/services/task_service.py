@@ -13,6 +13,7 @@ load_dotenv()
 
 
 class TaskService:
+    """Service for task business logic."""
 
     def __init__(
         self,
@@ -33,16 +34,21 @@ class TaskService:
         description: str,
         deadline: Optional[datetime] = None,
     ) -> Tuple[bool, str]:
+        """Add a new task to a project."""
+        # Validate title length
         if len(title) > 30:
             return False, "Error: Task title cannot exceed 30 characters."
 
+        # Validate description length
         if len(description) > 150:
             return False, "Error: Task description cannot exceed 150 characters."
 
+        # Check if project exists
         project = self.project_repository.get_by_id(project_id)
         if not project:
             return False, "Error: Project with this ID not found."
 
+        # Check max tasks per project limit
         task_count = self.task_repository.count_by_project_id(project_id)
         if task_count >= self.max_tasks_per_project:
             return (
@@ -54,6 +60,7 @@ class TaskService:
         return True, f"Task '{title}' created successfully. (ID: {task.id})"
 
     def change_task_status(self, task_id: int, new_status: str) -> Tuple[bool, str]:
+        """Change the status of a task."""
         if new_status not in self.valid_statuses:
             return (
                 False,
@@ -72,16 +79,11 @@ class TaskService:
             return False, "Error: Task with this ID not found."
 
     def get_tasks_by_project(self, project_id: int) -> List[Task]:
+        """Get all tasks for a project."""
         return self.task_repository.get_by_project_id(project_id)
 
-    def delete_task(self, task_id: int) -> Tuple[bool, str]:
-        try:
-            task = self.task_repository.delete(task_id)
-            return True, f"Task '{task.title}' deleted successfully."
-        except EntityNotFoundException:
-            return False, "Error: Task with this ID not found."
-
     def close_overdue_tasks(self) -> int:
+        """Close all overdue tasks. Returns the count of closed tasks."""
         overdue_tasks = self.task_repository.get_overdue_tasks()
         for task in overdue_tasks:
             self.task_repository.close_overdue_task(task)
